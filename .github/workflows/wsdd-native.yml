@@ -26,7 +26,7 @@ jobs:
         PACKAGEDIR=$BUILDDIR/wsddn_package
         mkdir -p $PACKAGEDIR/DEBIAN $PACKAGEDIR/usr/share/doc/mos-wsdd-native $PACKAGEDIR/etc/init.d
 
-        # wsddn-native
+        # wsdd-native
         cd $BUILDDIR
         git clone --branch $WSDDN_V --single-branch --depth 1 https://github.com/gershnik/wsdd-native.git
         cd $BUILDDIR/wsdd-native
@@ -54,8 +54,8 @@ jobs:
 
         cd $BUILDDIR
         chmod -R 755 $PACKAGEDIR
-        dpkg-deb --build wsddn_package mos-wsddn-native_${WSDDN_V#*v}_amd64.deb
-        md5sum $BUILDDIR/mos-wsddn-native_${WSDDN_V#*v}_amd64.deb | awk '{print $1}' > $BUILDDIR/mos-wsddn-native_${WSDDN_V#*v}_amd64.deb.md5
+        dpkg-deb --build wsddn_package mos-wsdd-native_${WSDDN_V#*v}_amd64.deb
+        md5sum $BUILDDIR/mos-wsdd-native_${WSDDN_V#*v}_amd64.deb | awk '{print $1}' > $BUILDDIR/mos-wsdd-native_${WSDDN_V#*v}_amd64.deb.md5
 
         echo "WSDDN_V=${WSDDN_V#*v}
         BUILDDIR=$BUILDDIR" >> $GITHUB_ENV
@@ -82,8 +82,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ env.BUILDDIR }}/mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb
-        asset_name: mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb
+        asset_path: ${{ env.BUILDDIR }}/mos-wsdd-native_${{ env.WSDDN_V }}_amd64.deb
+        asset_name: mos-wsdd-native_${{ env.WSDDN_V }}_amd64.deb
         asset_content_type: application/vnd.debian.binary-package
 
     - name: Upload md5 to Release
@@ -92,8 +92,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ env.BUILDDIR }}/mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb.md5
-        asset_name: mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb.md5
+        asset_path: ${{ env.BUILDDIR }}/mos-wsdd-native_${{ env.WSDDN_V }}_amd64.deb.md5
+        asset_name: mos-wsdd-native_${{ env.WSDDN_V }}_amd64.deb.md5
         asset_content_type: text/plain
 
     - name: Cleanup
