@@ -35,7 +35,7 @@ jobs:
 
         cmake --build out -j$(nproc --all)
 
-        cmake --install out --prefix $PACKAGEDIR --strip
+        cmake --install out --prefix $PACKAGEDIR/usr --strip
 
         # Copy MOS wsddn init.d script
         cp ${{ github.workspace }}/etc/init.d/wsddn $PACKAGEDIR/etc/init.d/wsddn
