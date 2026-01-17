@@ -1,0 +1,36 @@
+name: Check Version
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+jobs:
+  check_version:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check version
+      run: |
+        # Get version from wsdd-native
+        WSDDN_V=$(curl -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} -s https://api.github.com/repos/gershnik/wsdd-native/releases/latest | jq -r '.tag_name')
+        
+        # Get version from this repo
+        AVAILABLE_V=$(curl -s \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')
+        
+        # Check if versions are empty or null
+        if [ -z "$WSDDN_V" ] || [ "$WSDDN_V" = "null" ] || [ -z "$AVAILABLE_V" ] || [ "$AVAILABLE_V" = "null" ]; then
+          echo "Couldn't get Version numbers"
+          exit 1
+        fi
+
+        if [ "${WSDDN_V#*-}" != "${AVAILABLE_V#v}" ]; then
+          echo "Newer version found: v${WSDDN_V#*-}"
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/wsdd-native.yml/dispatches" \
+            -d "{\"ref\":\"master\"}"
+        else
+          echo "Nothing to do"
+        fi

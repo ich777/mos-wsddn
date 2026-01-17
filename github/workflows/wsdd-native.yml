@@ -1,0 +1,101 @@
+name: wsddn Compile
+
+on:
+  # Allow to trigger action manually
+  workflow_dispatch:
+
+jobs:
+  build_wsdd-native:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+
+    - name: Install dependencies
+      run: |
+        apt-get update && apt-get -y install jq wget curl git build-essential cmake
+
+    - name: Compile wsddn
+      run: |
+        # Get wsddn version and create necessary directories
+        WSDDN_V=$(curl -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} -s https://api.github.com/repos/gershnik/wsdd-native/releases/latest | jq -r '.tag_name')
+        BUILDDIR=${{ github.workspace }}/$WSDDN_V
+        PACKAGEDIR=$BUILDDIR/wsddn_package
+        mkdir -p $PACKAGEDIR/DEBIAN $PACKAGEDIR/usr/share/doc/mos-wsdd-native $PACKAGEDIR/etc/init.d
+
+        # wsddn-native
+        cd $BUILDDIR
+        git clone --branch $WSDDN_V --single-branch --depth 1 https://github.com/gershnik/wsdd-native.git
+        cd $BUILDDIR/wsdd-native
+        git checkout $WSDDN_V
+        cmake -S . -B out -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWSDDN_WITH_SYSTEMD="no" -DCMAKE_INSTALL_PREFIX=/usr
+
+        cmake --build out -j$(nproc --all)
+
+        cmake --install out --prefix $PACKAGEDIR --strip
+
+        # Copy MOS wsddn init.d script
+        cp ${{ github.workspace }}/etc/init.d/wsddn $PACKAGEDIR/etc/init.d/wsddn
+
+        # Add licenses
+        cp "${{ github.workspace }}/LICENSE" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/LICENSE"
+        cp "${{ github.workspace }}/Acknowledgements.md" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/Acknowledgements.md"
+
+        cat > $PACKAGEDIR/DEBIAN/control << EOF
+        Package: wsdd-native
+        Version: ${WSDDN_V#*-}-mos
+        Architecture: amd64
+        Maintainer: admin@minenet.at
+        Description: Custom wsdd-native build for MOS
+        EOF
+
+        cd $BUILDDIR
+        chmod -R 755 $PACKAGEDIR
+        dpkg-deb --build wsddn_package mos-wsddn-native_${WSDDN_V#*-}_amd64.deb
+        md5sum $BUILDDIR/mos-wsddn-native_${WSDDN_V#*-}_amd64.deb | awk '{print $1}' > $BUILDDIR/mos-wsddn-native_${WSDDN_V#*-}_amd64.deb.md5
+
+        echo "WSDDN_V=${WSDDN_V#*-}
+        BUILDDIR=$BUILDDIR" >> $GITHUB_ENV
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.WSDDN_V }}
+        release_name: "wsdd-native ${{ env.WSDDN_V }}"
+        body: |
+          This is the custom Debian package from wsdd-native for MOS
+
+          ### Package contents:
+          - [wsdd-native](https://github.com/gershnik/wsdd-native) v${{ env.WSDDN_V }}
+        draft: false
+        prerelease: false
+
+    - name: Upload deb to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ env.BUILDDIR }}/mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb
+        asset_name: mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb
+        asset_content_type: application/vnd.debian.binary-package
+
+    - name: Upload md5 to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ env.BUILDDIR }}/mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb.md5
+        asset_name: mos-wsddn-native_${{ env.WSDDN_V }}_amd64.deb.md5
+        asset_content_type: text/plain
+
+    - name: Cleanup
+      if: always()
+      run: rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.*
