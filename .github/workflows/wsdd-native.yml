@@ -41,8 +41,8 @@ jobs:
         cp ${{ github.workspace }}/etc/init.d/wsddn $PACKAGEDIR/etc/init.d/wsddn
 
         # Add licenses
-        cp "${{ github.workspace }}/LICENSE" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/LICENSE"
-        cp "${{ github.workspace }}/Acknowledgements.md" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/Acknowledgements.md"
+        cp "$BUILDDIR/wsdd-native/LICENSE" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/LICENSE"
+        cp "$BUILDDIR/wsdd-native/Acknowledgements.md" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/Acknowledgements.md"
 
         cat > $PACKAGEDIR/DEBIAN/control << EOF
         Package: wsdd-native
