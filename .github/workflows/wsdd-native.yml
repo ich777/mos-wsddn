@@ -46,7 +46,7 @@ jobs:
 
         cat > $PACKAGEDIR/DEBIAN/control << EOF
         Package: wsdd-native
-        Version: ${WSDDN_V#*-}-mos
+        Version: ${WSDDN_V#*v}-mos
         Architecture: amd64
         Maintainer: admin@minenet.at
         Description: Custom wsdd-native build for MOS
@@ -54,10 +54,10 @@ jobs:
 
         cd $BUILDDIR
         chmod -R 755 $PACKAGEDIR
-        dpkg-deb --build wsddn_package mos-wsddn-native_${WSDDN_V#*-}_amd64.deb
-        md5sum $BUILDDIR/mos-wsddn-native_${WSDDN_V#*-}_amd64.deb | awk '{print $1}' > $BUILDDIR/mos-wsddn-native_${WSDDN_V#*-}_amd64.deb.md5
+        dpkg-deb --build wsddn_package mos-wsddn-native_${WSDDN_V#*v}_amd64.deb
+        md5sum $BUILDDIR/mos-wsddn-native_${WSDDN_V#*v}_amd64.deb | awk '{print $1}' > $BUILDDIR/mos-wsddn-native_${WSDDN_V#*v}_amd64.deb.md5
 
-        echo "WSDDN_V=${WSDDN_V#*-}
+        echo "WSDDN_V=${WSDDN_V#*v}
         BUILDDIR=$BUILDDIR" >> $GITHUB_ENV
 
     - name: Create Release
