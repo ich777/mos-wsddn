@@ -31,7 +31,7 @@ jobs:
         git clone --branch $WSDDN_V --single-branch --depth 1 https://github.com/gershnik/wsdd-native.git
         cd $BUILDDIR/wsdd-native
         git checkout $WSDDN_V
-        cmake -S . -B out -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWSDDN_WITH_SYSTEMD="no" -DCMAKE_INSTALL_PREFIX=/usr
+        cmake -S . -B out -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWSDDN_WITH_SYSTEMD="no" -DCMAKE_INSTALL_PREFIX=/usr/bin
 
         cmake --build out -j$(nproc --all)
 
