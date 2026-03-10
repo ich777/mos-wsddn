@@ -1,0 +1,119 @@
+name: wsddn Compile
+
+on:
+  # Allow to trigger action manually
+  workflow_dispatch:
+
+jobs:
+  build_wsdd-native:
+    runs-on: [self-hosted, ARM64]
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+
+    - name: Install dependencies
+      run: |
+        apt-get update && apt-get -y install jq wget curl git build-essential cmake
+
+    - name: Compile wsddn
+      run: |
+        # Get wsddn version and create necessary directories
+        WSDDN_V=$(curl -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} -s https://api.github.com/repos/gershnik/wsdd-native/releases/latest | jq -r '.tag_name')
+        BUILDDIR=${{ github.workspace }}/$WSDDN_V
+        PACKAGEDIR=$BUILDDIR/wsddn_package
+        mkdir -p $PACKAGEDIR/DEBIAN $PACKAGEDIR/usr/share/doc/mos-wsdd-native $PACKAGEDIR/etc/init.d
+
+        # wsdd-native
+        cd $BUILDDIR
+        git clone --branch $WSDDN_V --single-branch --depth 1 https://github.com/gershnik/wsdd-native.git
+        cd $BUILDDIR/wsdd-native
+        git checkout $WSDDN_V
+        cmake -S . -B out -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWSDDN_WITH_SYSTEMD="no" -DCMAKE_INSTALL_PREFIX=/usr/bin
+
+        cmake --build out -j$(nproc --all)
+
+        cmake --install out --prefix $PACKAGEDIR/usr --strip
+
+        # Copy MOS wsddn init.d script
+        cp ${{ github.workspace }}/etc/init.d/wsddn $PACKAGEDIR/etc/init.d/wsddn
+
+        # Add licenses
+        cp "$BUILDDIR/wsdd-native/LICENSE" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/LICENSE"
+        cp "$BUILDDIR/wsdd-native/Acknowledgements.md" "$PACKAGEDIR/usr/share/doc/mos-wsdd-native/Acknowledgements.md"
+
+        cat > $PACKAGEDIR/DEBIAN/control << EOF
+        Package: wsdd-native
+        Version: ${WSDDN_V#*v}-mos
+        Architecture: amd64
+        Maintainer: admin@minenet.at
+        Description: Custom wsdd-native build for MOS
+        EOF
+
+        cd $BUILDDIR
+        chmod -R 755 $PACKAGEDIR
+        dpkg-deb --build wsddn_package mos-wsdd-native_${WSDDN_V#*v}_amd64.deb
+        md5sum $BUILDDIR/mos-wsdd-native_${WSDDN_V#*v}_amd64.deb | awk '{print $1}' > $BUILDDIR/mos-wsdd-native_${WSDDN_V#*v}_amd64.deb.md5
+
+        echo "WSDDN_V=${WSDDN_V#*v}
+        BUILDDIR=$BUILDDIR" >> $GITHUB_ENV
+
+    - name: Create and Upload Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ env.WSDDN_V }}
+        name: "wsdd-native ${{ env.WSDDN_V }}"
+        body: |
+          This is the custom Debian package from wsdd-native for MOS
+
+          ### Package contents:
+          - [wsdd-native](https://github.com/gershnik/wsdd-native) v${{ env.WSDDN_V }}
+        files: |
+          ${{ env.BUILDDIR }}/mos-wsdd-native*
+        overwrite_files: true
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set notification variables on success
+      if: success()
+      run: |
+        echo "NOTIFICATION_PRIORITY=0" >> $GITHUB_ENV
+        echo "NOTIFICATION_MESSAGE=Built wsddn v${{ env.WSDDN_V }}" >> $GITHUB_ENV
+
+    - name: Set notification variables on failure
+      if: failure()
+      run: |
+        echo "NOTIFICATION_PRIORITY=1" >> $GITHUB_ENV
+        echo "NOTIFICATION_MESSAGE=Failed to build wsddn v${{ env.WSDDN_V }}" >> $GITHUB_ENV
+
+    - name: Cleanup & Notification
+      if: always()
+      run: |
+        # Discord notification function
+        discord_push_notification() {
+          if [ $3 -ge 1 ]; then
+            COLOR=16711680
+          else
+            COLOR=65280
+          fi
+
+          data=$(cat <<EOF
+        {
+          "embeds": [{
+            "title": "${1}",
+            "description": "${2}",
+            "color": ${COLOR}
+          }]
+        }
+        EOF
+        )
+          curl -H "Content-Type: application/json" -d "$data" "${{ secrets.DISCORD_WEBHOOK_URL }}"
+        }
+
+        discord_push_notification "${{ github.workflow }}" "${{ env.NOTIFICATION_MESSAGE }}" "${{ env.NOTIFICATION_PRIORITY }}"
+        rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.*
